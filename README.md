@@ -4,8 +4,8 @@ Parallel ML training on a 4-node **AWS EMR Spark cluster**, a single-machine **p
 
 | Item | Link |
 |---|---|
-| GitHub | `https://github.com/<your-username>/cs643-energy-prediction` |
-| Docker Hub | `https://hub.docker.com/r/<your-dockerhub-user>/cs643-energy-predict` |
+| GitHub | `https://github.com/jd878-gif/cs643-energy-prediction` |
+| Docker Hub | `https://hub.docker.com/r/dj11108/cs643-energy-predict` |
 
 ## Results (validation set, 200 rows)
 
@@ -39,8 +39,8 @@ scripts/ec2_setup_prediction.sh  Installs Java/PySpark/Docker on the prediction 
 ### 1a. Prepare S3
 1. AWS Console → **S3** → *Create bucket*, e.g. `cs643-pa2-<ucid>` (region `us-east-1`).
 2. Create the folders `code/` and `data/`, and upload:
-   - `training/train.py` → `s3://<bucket>/code/train.py`
-   - `data/TrainingDataset.csv`, `data/ValidationDataset.csv` → `s3://<bucket>/data/`
+   - `training/train.py` → `s3://cs643-pa2-jd878/code/train.py`
+   - `data/TrainingDataset.csv`, `data/ValidationDataset.csv` → `s3://cs643-pa2-jd878/data/`
 
 ### 1b. Create the EMR cluster
 AWS Console → **EMR** → *Create cluster*:
@@ -48,7 +48,7 @@ AWS Console → **EMR** → *Create cluster*:
 - **Instance groups:** Primary = 1 × `m5.xlarge`, Core = **3** × `m5.xlarge` → **4 EC2 instances in total**. Task group: remove it.
 - **Security configuration and EC2 key pair:** choose your key pair (AWS Academy: `vockey`).
 - **IAM roles:** Service role = `EMR_DefaultRole`, EC2 instance profile = `EMR_EC2_DefaultRole`. In AWS Academy these exist already. Otherwise run `aws emr create-default-roles` once.
-- **Cluster logs:** `s3://<bucket>/emr-logs/`.
+- **Cluster logs:** `s3://cs643-pa2-jd878/emr-logs/`.
 - Click **Create cluster** and wait until the status is **Waiting** (≈10 min).
 
 ### 1c. Run the training job (two options)
@@ -56,29 +56,29 @@ AWS Console → **EMR** → *Create cluster*:
 **Option A – EMR Step (console):** Cluster → *Steps* → *Add step*
 - Type: **Spark application**, Deploy mode: **Cluster**
 - Spark-submit options: `--num-executors 6 --executor-cores 2`
-- Application location: `s3://<bucket>/code/train.py`
+- Application location: `s3://cs643-pa2-jd878/code/train.py`
 - Arguments:
   ```
-  --train s3://<bucket>/data/TrainingDataset.csv
-  --validation s3://<bucket>/data/ValidationDataset.csv
-  --model-output s3://<bucket>/model
-  --metrics-output s3://<bucket>/metrics
+  --train s3://cs643-pa2-jd878/data/TrainingDataset.csv
+  --validation s3://cs643-pa2-jd878/data/ValidationDataset.csv
+  --model-output s3://cs643-pa2-jd878/model
+  --metrics-output s3://cs643-pa2-jd878/metrics
   --partitions 12
   ```
 
 **Option B – SSH to the primary node:**
 ```bash
 ssh -i labsuser.pem hadoop@<primary-public-DNS>     # open port 22 in the primary node's security group first
-aws s3 cp s3://<bucket>/code/train.py .
+aws s3 cp s3://cs643-pa2-jd878/code/train.py .
 spark-submit --master yarn --deploy-mode client --num-executors 6 --executor-cores 2 train.py \
-  --train s3://<bucket>/data/TrainingDataset.csv \
-  --validation s3://<bucket>/data/ValidationDataset.csv \
-  --model-output s3://<bucket>/model --metrics-output s3://<bucket>/metrics --partitions 12
+  --train s3://cs643-pa2-jd878/data/TrainingDataset.csv \
+  --validation s3://cs643-pa2-jd878/data/ValidationDataset.csv \
+  --model-output s3://cs643-pa2-jd878/model --metrics-output s3://cs643-pa2-jd878/metrics --partitions 12
 ```
 
-**Option C – fully scripted** (from a machine with the AWS CLI): `BUCKET=<bucket> bash scripts/emr_train.sh`
+**Option C – fully scripted** (from a machine with the AWS CLI): `BUCKET=cs643-pa2-jd878 bash scripts/emr_train.sh`
 
-The job prints the hosts that ran its tasks (`Hosts in cluster : 3 -> [...]`), which shows the training is distributed. It then prints the train/validation RMSE of every candidate model and saves the best `PipelineModel` to `s3://<bucket>/model`. To parallelize, the training data is repartitioned across the executors on the 3 core nodes, and each MLlib `fit()` (L-BFGS/normal-equation aggregation, tree-split statistics) runs as distributed Spark stages. **Terminate the cluster afterwards.**
+The job prints the hosts that ran its tasks (`Hosts in cluster : 3 -> [...]`), which shows the training is distributed. It then prints the train/validation RMSE of every candidate model and saves the best `PipelineModel` to `s3://cs643-pa2-jd878/model`. To parallelize, the training data is repartitioned across the executors on the 3 core nodes, and each MLlib `fit()` (L-BFGS/normal-equation aggregation, tree-split statistics) runs as distributed Spark stages. **Terminate the cluster afterwards.**
 
 ---
 
@@ -89,10 +89,10 @@ The job prints the hosts that ran its tasks (`Hosts in cluster : 3 -> [...]`), w
 2. Connect and set up:
    ```bash
    ssh -i labsuser.pem ubuntu@<ec2-public-DNS>
-   git clone https://github.com/<your-username>/cs643-energy-prediction.git
+   git clone https://github.com/jd878-gif/cs643-energy-prediction.git
    cd cs643-energy-prediction
    bash scripts/ec2_setup_prediction.sh          # Java 17, PySpark 3.5.1 venv, Docker
-   rm -rf model && aws s3 cp --recursive s3://<bucket>/model model   # model trained on EMR
+   rm -rf model && aws s3 cp --recursive s3://cs643-pa2-jd878/model model   # model trained on EMR
    ```
 3. Run:
    ```bash
@@ -111,20 +111,20 @@ The job prints the hosts that ran its tasks (`Hosts in cluster : 3 -> [...]`), w
 
 ### Build and push (on the EC2 instance, after step 2)
 ```bash
-docker build -t <dockerhub-user>/cs643-energy-predict:latest .
+docker build -t dj11108/cs643-energy-predict:latest .
 docker login
-docker push <dockerhub-user>/cs643-energy-predict:latest
+docker push dj11108/cs643-energy-predict:latest
 ```
 *(Optional, so the image also runs natively on Apple-Silicon Macs:*
-`docker buildx create --use && docker buildx build --platform linux/amd64,linux/arm64 -t <dockerhub-user>/cs643-energy-predict:latest --push .`*)*
+`docker buildx create --use && docker buildx build --platform linux/amd64,linux/arm64 -t dj11108/cs643-energy-predict:latest --push .`*)*
 
 ### Run (any machine with Docker)
 The test file is on the host, so mount its folder into the container with `-v` and pass the path *inside* the container:
 ```bash
-sudo docker pull <dockerhub-user>/cs643-energy-predict:latest
-sudo docker run --rm -v /path/to/folder:/data <dockerhub-user>/cs643-energy-predict:latest /data/TestDataset.csv
+sudo docker pull dj11108/cs643-energy-predict:latest
+sudo docker run --rm -v /path/to/folder:/data dj11108/cs643-energy-predict:latest /data/TestDataset.csv
 # e.g. from the folder that holds the file:
-sudo docker run --rm -v "$(pwd)":/data <dockerhub-user>/cs643-energy-predict:latest /data/TestDataset.csv
+sudo docker run --rm -v "$(pwd)":/data dj11108/cs643-energy-predict:latest /data/TestDataset.csv
 ```
 The image contains the trained model, Java 17, Python 3.11, and PySpark 3.5.1. It needs no Spark cluster.
 
