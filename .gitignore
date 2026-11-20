@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+metrics/
+spark-warehouse/
+metastore_db/
+derby.log
+.venv/
+# NOTE: model/ is intentionally committed so the Docker image can be rebuilt.
